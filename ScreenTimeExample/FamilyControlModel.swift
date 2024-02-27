@@ -19,7 +19,7 @@ class FamilyControlModel: ObservableObject {
     }
 
     private let store = ManagedSettingsStore()
-    private let userDefaultName = "group.ScreenTimeSelection"
+    private let userDefaultName = "group.com.drminh.ScreenTimeExample"
     private let userDefaultsKey = "ScreenTimeSelection"
     private let encoder = PropertyListEncoder()
     private let decoder = PropertyListDecoder()
@@ -34,8 +34,7 @@ class FamilyControlModel: ObservableObject {
         try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
     }
 
-    func encourageAll(){
-        showLocalNotification(title: "Encourage All!")
+    func encourageAll() {
         store.shield.applications = []
         store.shield.applicationCategories = ShieldSettings
             .ActivityCategoryPolicy
@@ -51,7 +50,6 @@ class FamilyControlModel: ObservableObject {
     
     func restrict() {
         guard let savedSelection else { return }
-        showLocalNotification(title: "Restrict")
         print ("got here \(savedSelection)")
 
         let applications = savedSelection.applicationTokens
@@ -72,6 +70,43 @@ class FamilyControlModel: ObservableObject {
             .specific(
                 categories
             )
+    }
+    
+    func schedulingRestrictions() {
+        guard let savedSelection else { return }
+        let center = DeviceActivityCenter()
+
+        // Stops existing monitoring. You may or may not need this
+        // depend on exactly what you're doing.
+
+        center.stopMonitoring()
+
+        let activity = DeviceActivityName("MyApp.ScreenTime")
+        let eventName = DeviceActivityEvent.Name(UUID().uuidString)
+        let timeLimitMinutes = 5
+        let schedule = DeviceActivitySchedule(
+            intervalStart: DateComponents(hour: 0, minute: 0, second: 0),
+            intervalEnd: DateComponents(hour: 23, minute: 59, second: 59),
+            repeats: true
+        )
+        let event = DeviceActivityEvent(
+            applications: savedSelection.applicationTokens,
+            categories: savedSelection.categoryTokens,
+            webDomains: savedSelection.webDomainTokens,
+            threshold: .init(minute: timeLimitMinutes)
+        )
+        
+        do {
+            try center.startMonitoring(
+                activity,
+                during: schedule,
+                events: [
+                    eventName: event
+                ]
+            )
+        } catch {
+            print(error)
+        }
     }
 
     func saveSelection(selection: FamilyActivitySelection) {
